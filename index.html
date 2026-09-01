@@ -226,12 +226,45 @@ var TOPE = 120;        // cuantos se pintan de golpe
 var DOC = null;        // documento abierto
 
 // ---------- carga ----------
+var intento = 0;
+
+function cargando(txt){
+  document.getElementById('salida').innerHTML =
+    '<div class="load"><b>' + txt + '</b>El catálogo pesa cerca de 700 KB. ' +
+    'En celular puede tardar hasta un minuto la primera vez.</div>';
+}
+
 function cargar(){
+  intento++;
+  if(intento > 1) cargando('Reintentando…');
+
   var s = document.createElement('script');
-  s.src = API + '?callback=recibir&t=' + new Date().getTime();
-  s.onerror = function(){ fallo('No se pudo conectar con el servidor.'); };
+  // sin parametro de tiempo: asi el navegador puede reutilizar la descarga
+  s.src = API + '?callback=recibir';
+  var cerrado = false;
+
+  var tmr = setTimeout(function(){
+    if(D || cerrado) return;
+    cerrado = true;
+    if(intento < 3) cargar();
+    else fallo('El servidor tardó demasiado en responder.');
+  }, 90000);
+
+  s.onerror = function(){
+    if(D || cerrado) return;
+    cerrado = true; clearTimeout(tmr);
+    if(intento < 3) cargar();
+    else fallo('El navegador no pudo descargar el catálogo. Puede que la página lo esté bloqueando.');
+  };
+
+  s.onload = function(){
+    clearTimeout(tmr);
+    setTimeout(function(){
+      if(!D && !cerrado){ cerrado = true; fallo('El servidor respondió pero sin datos. Falta correr publicar().'); }
+    }, 2000);
+  };
+
   document.body.appendChild(s);
-  setTimeout(function(){ if(!D) fallo('El servidor no respondió a tiempo.'); }, 45000);
 }
 
 function recibir(data){
@@ -246,8 +279,12 @@ function recibir(data){
 
 function fallo(msg){
   document.getElementById('salida').innerHTML =
-    '<div class="load err"><b>No se pudo cargar el catálogo</b>' + msg +
-    '<br><br>Revisa que el backend esté implementado y vuelve a intentar.</div>';
+    '<div class="load err"><b>No se pudo cargar el catálogo</b>' + esc(msg) +
+    '<br><br><button class="btn" onclick="intento=0;cargando(\'Cargando el catálogo…\');cargar()">Reintentar</button>' +
+    '<br><br><a href="' + API + '" target="_blank" rel="noopener" style="color:var(--sage);font-size:12px;">' +
+    'Probar el servidor directamente ↗</a>' +
+    '<div style="font-size:11.5px;margin-top:10px;">Si al abrir ese enlace ves texto que empieza con <b>{"v":</b>, ' +
+    'el servidor está bien y el problema es de esta página.</div></div>';
   document.getElementById('hstate').textContent = 'Sin conexión';
 }
 
