@@ -83,10 +83,10 @@ details.help p{color:var(--stone);margin:8px 0 0;}
 details.help b{color:#333;}
 
 .modal{position:fixed;inset:0;background:rgba(14,59,54,.55);z-index:50;
-display:none;align-items:center;justify-content:center;padding:20px;}
+display:none;align-items:center;justify-content:center;padding:10px;}
 .modal.on{display:flex;}
-.mbox{background:var(--card);border-radius:var(--r);width:100%;max-width:1000px;
-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh-h);}
+.mbox{background:var(--card);border-radius:var(--r);width:100%;max-width:1500px;
+height:96vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sh-h);}
 .mhead{background:var(--petrol);color:#fff;padding:12px 16px;display:flex;
 align-items:center;gap:12px;flex-wrap:wrap;}
 .mhead .mt{font-size:15px;font-weight:700;}
@@ -94,17 +94,19 @@ align-items:center;gap:12px;flex-wrap:wrap;}
 .mclose{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.35);color:#fff;
 font-family:inherit;font-size:13px;font-weight:700;border-radius:8px;padding:6px 12px;cursor:pointer;}
 .mclose:hover{background:rgba(255,255,255,.12);}
-.mpags{display:flex;gap:5px;padding:9px 14px;border-bottom:1px solid var(--warm);
+.mpags{display:flex;align-items:center;gap:5px;padding:9px 14px;border-bottom:1px solid var(--warm);
 overflow-x:auto;background:var(--warm-light);}
 .mpags button{flex:none;background:#fff;border:1px solid var(--warm);color:var(--stone);
 font-family:inherit;font-size:12.5px;font-weight:700;border-radius:7px;padding:6px 13px;cursor:pointer;}
 .mpags button.active{background:var(--sage);color:#fff;border-color:var(--sage);}
-.mbody{flex:1;position:relative;background:var(--warm-light);}
-.mbody iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.mpags .rot{margin-left:auto;background:var(--sage);color:#fff;border-color:var(--sage);
+display:inline-flex;align-items:center;gap:6px;}
+.mpags .rot:hover{background:var(--sage-dark);}
+.mbody{flex:1;position:relative;background:var(--warm-light);overflow:hidden;}
+.mbody iframe{position:absolute;top:50%;left:50%;border:0;
+transform-origin:center center;transition:transform .18s;}
 .mfoot{padding:9px 16px;border-top:1px solid var(--warm);font-size:12px;color:var(--stone);
 display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.mfoot a{color:var(--sage);font-weight:700;text-decoration:none;}
-.mfoot a:hover{text-decoration:underline;}
 
 .load{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);
 padding:40px 20px;text-align:center;color:var(--stone);}
@@ -213,7 +215,6 @@ padding:40px 20px;text-align:center;color:var(--stone);}
     <div class="mbody"><iframe id="mframe" src="" allow="autoplay"></iframe></div>
     <div class="mfoot">
       <span id="mfile"></span>
-      <a id="mlink" href="#" target="_blank" rel="noopener">Abrir en Drive ↗</a>
     </div>
   </div>
 </div>
@@ -420,19 +421,27 @@ function render(){
 function mas(){ TOPE += 120; render(); }
 
 // ---------- visor ----------
+var GIRO = 0;
+
 function abrir(i){
   DOC = VISTA[i];
+  GIRO = 0;
   document.getElementById('mt').textContent = D.tip[DOC[4]];
   document.getElementById('ms').textContent =
     D.cli[DOC[0]] + ' · Grupo ' + (DOC[1]||'—') + ' · Estilo ' + (DOC[2]||'—') +
     ' · ' + (DOC[3]||'sin color');
 
   var h = '';
-  for(var p=0;p<DOC[6].length;p++){
-    h += '<button onclick="pagina('+p+')" id="pg'+p+'">Pág. ' + DOC[6][p][0] + '</button>';
+  if(DOC[6].length > 1){
+    for(var p=0;p<DOC[6].length;p++){
+      h += '<button onclick="pagina('+p+')" id="pg'+p+'">Pág. ' + DOC[6][p][0] + '</button>';
+    }
+  } else {
+    h += '<span style="font-size:12.5px;color:var(--stone);font-weight:700;">Documento de 1 página</span>';
   }
+  h += '<button class="rot" onclick="girar()" title="Girar 90 grados">&#8635; Girar</button>';
   document.getElementById('mpags').innerHTML = h;
-  document.getElementById('mpags').style.display = DOC[6].length>1 ? 'flex' : 'none';
+
   document.getElementById('modal').classList.add('on');
   document.body.style.overflow = 'hidden';
   pagina(0);
@@ -442,16 +451,44 @@ function pagina(p){
   var pg = DOC[6][p];
   document.getElementById('mframe').src = 'https://drive.google.com/file/d/' + pg[1] + '/preview';
   document.getElementById('mfile').textContent = pg[2];
-  document.getElementById('mlink').href = 'https://drive.google.com/file/d/' + pg[1] + '/view';
   var bs = document.getElementById('mpags').getElementsByTagName('button');
-  for(var i=0;i<bs.length;i++) bs[i].className = (i===p ? 'active' : '');
+  for(var i=0;i<bs.length;i++){
+    if(bs[i].className.indexOf('rot')!==-1) continue;
+    bs[i].className = '';
+  }
+  var b = document.getElementById('pg'+p);
+  if(b) b.className = 'active';
+  GIRO = 0;
+  encajar();
+}
+
+function girar(){
+  GIRO = (GIRO + 90) % 360;
+  encajar();
+}
+
+/** Ajusta el tamaño del visor segun el giro: al rotar 90 grados
+    hay que intercambiar alto y ancho para que no queden franjas. */
+function encajar(){
+  var caja = document.querySelector('.mbody');
+  var f = document.getElementById('mframe');
+  if(!caja || !f) return;
+  var w = caja.clientWidth, h = caja.clientHeight;
+  if(GIRO === 90 || GIRO === 270){ f.style.width = h + 'px'; f.style.height = w + 'px'; }
+  else                           { f.style.width = w + 'px'; f.style.height = h + 'px'; }
+  f.style.transform = 'translate(-50%,-50%) rotate(' + GIRO + 'deg)';
 }
 
 function cerrar(){
   document.getElementById('modal').classList.remove('on');
   document.getElementById('mframe').src = '';
   document.body.style.overflow = '';
+  GIRO = 0;
 }
+
+window.addEventListener('resize', function(){
+  if(document.getElementById('modal').classList.contains('on')) encajar();
+});
 
 // ---------- utilidades ----------
 function esc(s){
