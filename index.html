@@ -273,6 +273,7 @@ function cargar(){
 function recibir(data){
   if(!data || data.error){ fallo(data && data.error ? data.error : 'Respuesta vacía.'); return; }
   D = data;
+  for(var i=0;i<D.docs.length;i++) D.docs[i][7] = i;
   document.getElementById('hstate').innerHTML =
     D.nDoc.toLocaleString('es-PE') + ' documentos · ' +
     D.nArch.toLocaleString('es-PE') + ' páginas<br>Actualizado ' + D.fecha;
@@ -396,7 +397,7 @@ function render(){
   var n = Math.min(TOPE, VISTA.length);
   for(var i=0;i<n;i++){
     var d = VISTA[i];
-    var np = d[6].length;
+    var np = d[6];
     h += '<div class="doc" onclick="abrir('+i+')">'
        +   '<div class="t">' + esc(D.tip[d[4]]) + '</div>'
        +   '<div class="m"><b>Grupo</b> ' + esc(d[1] || '—')
@@ -422,33 +423,74 @@ function mas(){ TOPE += 120; render(); }
 
 // ---------- visor ----------
 var GIRO = 0;
+var PAGS = {};        // enlaces ya pedidos, para no repetir la consulta
+var ESPERA = null;    // documento cuyo pedido esta en curso
+var PAG_ACT = [];
 
 function abrir(i){
   DOC = VISTA[i];
   GIRO = 0;
+  var di = DOC[7];
+
   document.getElementById('mt').textContent = D.tip[DOC[4]];
   document.getElementById('ms').textContent =
-    D.cli[DOC[0]] + ' · Grupo ' + (DOC[1]||'—') + ' · Estilo ' + (DOC[2]||'—') +
-    ' · ' + (DOC[3]||'sin color');
-
-  var h = '';
-  if(DOC[6].length > 1){
-    for(var p=0;p<DOC[6].length;p++){
-      h += '<button onclick="pagina('+p+')" id="pg'+p+'">Pág. ' + DOC[6][p][0] + '</button>';
-    }
-  } else {
-    h += '<span style="font-size:12.5px;color:var(--stone);font-weight:700;">Documento de 1 página</span>';
-  }
-  h += '<button class="rot" onclick="girar()" title="Girar 90 grados">&#8635; Girar</button>';
-  document.getElementById('mpags').innerHTML = h;
+    D.cli[DOC[0]] + ' \u00b7 Grupo ' + (DOC[1]||'\u2014') + ' \u00b7 Estilo ' + (DOC[2]||'\u2014') +
+    ' \u00b7 ' + (DOC[3]||'sin color');
 
   document.getElementById('modal').classList.add('on');
   document.body.style.overflow = 'hidden';
+  document.getElementById('mframe').src = '';
+  document.getElementById('mfile').textContent = '';
+
+  if(PAGS[di]){ montar(PAGS[di]); return; }
+
+  document.getElementById('mpags').innerHTML =
+    '<span style="font-size:12.5px;color:var(--stone);font-weight:700;">Abriendo documento\u2026</span>';
+  pedir(di);
+}
+
+function pedir(di){
+  ESPERA = di;
+  document.getElementById('mpags').innerHTML =
+    '<span style="font-size:12.5px;color:var(--stone);font-weight:700;">Abriendo documento\u2026</span>';
+  var s = document.createElement('script');
+  s.src = API + '?doc=' + di + '&callback=recibirPags';
+  s.onerror = function(){ if(ESPERA===di) errorDoc(di); };
+  document.body.appendChild(s);
+  setTimeout(function(){ if(ESPERA===di && !PAGS[di]) errorDoc(di); }, 30000);
+}
+
+function recibirPags(r){
+  if(!r || r.error || !r.p){ if(ESPERA!==null) errorDoc(ESPERA); return; }
+  PAGS[r.i] = r.p;
+  if(ESPERA === r.i){ ESPERA = null; montar(r.p); }
+}
+
+function errorDoc(di){
+  ESPERA = null;
+  document.getElementById('mpags').innerHTML =
+    '<span style="font-size:12.5px;color:var(--rose);font-weight:700;">No se pudo abrir el documento.</span>' +
+    '<button class="rot" onclick="pedir(' + di + ')" style="margin-left:auto;">Reintentar</button>';
+}
+
+function montar(p){
+  PAG_ACT = p;
+  var h = '';
+  if(p.length > 1){
+    for(var i=0;i<p.length;i++){
+      h += '<button onclick="pagina('+i+')" id="pg'+i+'">P\u00e1g. ' + p[i][0] + '</button>';
+    }
+  } else {
+    h += '<span style="font-size:12.5px;color:var(--stone);font-weight:700;">Documento de 1 p\u00e1gina</span>';
+  }
+  h += '<button class="rot" onclick="girar()" title="Girar 90 grados">&#8635; Girar</button>';
+  document.getElementById('mpags').innerHTML = h;
   pagina(0);
 }
 
 function pagina(p){
-  var pg = DOC[6][p];
+  var pg = PAG_ACT[p];
+  if(!pg) return;
   document.getElementById('mframe').src = 'https://drive.google.com/file/d/' + pg[1] + '/preview';
   document.getElementById('mfile').textContent = pg[2];
   var bs = document.getElementById('mpags').getElementsByTagName('button');
@@ -467,8 +509,8 @@ function girar(){
   encajar();
 }
 
-/** Ajusta el tamaño del visor segun el giro: al rotar 90 grados
-    hay que intercambiar alto y ancho para que no queden franjas. */
+/** Al girar 90 grados hay que intercambiar alto y ancho
+    para que el papel siga llenando el espacio. */
 function encajar(){
   var caja = document.querySelector('.mbody');
   var f = document.getElementById('mframe');
@@ -483,7 +525,7 @@ function cerrar(){
   document.getElementById('modal').classList.remove('on');
   document.getElementById('mframe').src = '';
   document.body.style.overflow = '';
-  GIRO = 0;
+  GIRO = 0; ESPERA = null;
 }
 
 window.addEventListener('resize', function(){
