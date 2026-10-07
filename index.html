@@ -907,7 +907,7 @@ function firmar(rutas){
   var faltan = rutas.filter(function(r){ return r && !firma(r); });
   if (!faltan.length) return Promise.resolve();
   return window.LIVES_SESION.llave().then(function(tk){
-    if (!tk) throw new Error('SIN_SESION');
+    tk = tk || SB_KEY;   /* sin sesión: se firma con la llave pública (lectura abierta) */
     return fetch(SB_URL + '/storage/v1/object/sign/' + BUCKET, {
       method:'POST',
       headers:{'Content-Type':'application/json', Authorization:'Bearer ' + tk, apikey:SB_KEY},
