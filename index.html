@@ -774,7 +774,7 @@ html.embebido body{padding-top:0!important;margin-top:0!important}
     <select id="fEst"><option value="">Todos los estilos</option></select>
     <select id="fCol"><option value="">Todos los colores</option></select>
     <select id="fTip"><option value="">Todos los documentos</option></select>
-    <input type="search" id="fTxt" placeholder="Buscar grupo, estilo o color…">
+    <input type="search" id="fTxt" placeholder="Buscar estilo…">
     <button class="btn" onclick="limpiar()">Limpiar</button>
     <div class="spacer cnt" id="cnt"></div>
   </div>
@@ -925,7 +925,7 @@ function cumple(d, salvo){
   if(salvo!=='col' && FILTRO.col && d[3]!==FILTRO.col) return false;
   if(salvo!=='tip' && FILTRO.tip && D.tip[d[4]]!==FILTRO.tip) return false;
   if(FILTRO.txt){
-    var t = (d[1]+' '+d[2]+' '+d[3]).toUpperCase();
+    var t = String(d[2]).toUpperCase();
     var ps = FILTRO.txt.toUpperCase().split(/\s+/);
     for(var i=0;i<ps.length;i++){ if(ps[i] && t.indexOf(ps[i])===-1) return false; }
   }
